@@ -1177,6 +1177,7 @@ function addLog(){
   // clear any dismissals for this contact since status has changed
   delete dismissals[`${activeId}_meeting`];
   delete dismissals[`${activeId}_outreach`];
+  delete dismissals[`${activeId}_followup`];
   saveDismissals();
   document.getElementById('m-notes').value='';
   save(); renderAll(); renderModalLog(c, true); toast('Action logged');
@@ -1573,6 +1574,22 @@ function getNotifications(){
         });
       }
     }
+
+    // Rule 3: Follow-up older than 2 weeks
+    if(latest.status==='s2' && days>NOTIF_OUTREACH_DAYS){
+      const key=`${c.id}_followup`;
+      const dis=dismissals[key];
+      if(!dis || (dis.type==='snooze' && now>dis.until)){
+        notifs.push({
+          id:key, contactId:c.id,
+          owner:c.owner||'—',
+          name:c.name,
+          rule:'followup',
+          msg:`Follow-up sent ${days} days ago. Follow up again or mark as No reply / Not Interested.`,
+          days
+        });
+      }
+    }
   });
   // sort by most overdue first
   notifs.sort((a,b)=>b.days-a.days);
@@ -1595,7 +1612,7 @@ function renderNotifications(){
   badge.textContent=notifs.length;
 
   list.innerHTML=notifs.map(n=>`
-    <div style="border:.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:6px;border-left:3px solid ${n.rule==='meeting'?'#97C459':'#EF9F27'}">
+    <div style="border:.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:6px;border-left:3px solid ${n.rule==='meeting'?'#97C459':n.rule==='followup'?'#85B7EB':'#EF9F27'}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div>
           <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Action for ${n.owner}</div>
