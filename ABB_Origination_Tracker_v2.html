@@ -7,9 +7,11 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
+  --co:#333333;--co-r:#ffffff;--co-a:#f0f0f0;--co-b:#cccccc;
   --el:#1A5C2A;--el-r:#f0f7f1;--el-a:#d4ebda;--el-b:#a8d5b0;
   --mo:#1A3A6B;--mo-r:#f0f4fa;--mo-a:#d0dff5;--mo-b:#a0bae8;
   --au:#7B3A00;--au-r:#fdf5ee;--au-a:#fce3c8;--au-b:#f0c090;
+  --ro:#5B2D8E;--rd-r:#f5f0fb;--rd-a:#e4d5f5;--rd-b:#c3a5e8;
   --s1-bg:#FFFFFF;--s1-c:#555555;--s1-b:#CCCCCC;
   --s2-bg:#E6F1FB;--s2-c:#185FA5;--s2-b:#85B7EB;
   --s3-bg:#FEF0E6;--s3-c:#A84800;--s3-b:#F0997B;
@@ -270,9 +272,11 @@ textarea.fi{height:70px;resize:vertical;line-height:1.5}
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
     <div class="legend" id="map-legend"></div>
     <div style="display:flex;gap:10px;margin-left:auto">
+      <span style="font-size:11px;font-weight:700;color:var(--co)">● CO</span>
       <span style="font-size:11px;font-weight:700;color:var(--el)">● EL</span>
       <span style="font-size:11px;font-weight:700;color:var(--mo)">● MO</span>
       <span style="font-size:11px;font-weight:700;color:var(--au)">● AU</span>
+      <span style="font-size:11px;font-weight:700;color:var(--ro)">● RO</span>
     </div>
   </div>
   <div class="map-hint">Click name to log · ★ = budget holder / decision maker · + add to insert contact</div>
@@ -366,9 +370,11 @@ textarea.fi{height:70px;resize:vertical;line-height:1.5}
         <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Map position</div>
         <label class="fl">Division</label>
         <select class="fi" id="e-div" onchange="updateEditSubOptions()">
+          <option value="CO">CO – Corporate</option>
           <option value="EL">EL – Electrification</option>
           <option value="MO">MO – Motion</option>
           <option value="AU">AU – Automation</option>
+          <option value="RO">RO – Robotics &amp; Discrete Automation</option>
         </select>
         <label class="fl">Sub-division</label>
         <select class="fi" id="e-sub"></select>
@@ -451,9 +457,11 @@ textarea.fi{height:70px;resize:vertical;line-height:1.5}
       <div class="step-lbl">Step 2 of 3 — Where do they sit?</div>
       <label class="fl">Division</label>
       <select class="fi" id="ap-div" onchange="updateSubOptions()">
+        <option value="CO">CO – Corporate</option>
         <option value="EL">EL – Electrification</option>
         <option value="MO">MO – Motion</option>
         <option value="AU">AU – Automation</option>
+        <option value="RO">RO – Robotics &amp; Discrete Automation</option>
       </select>
       <label class="fl">Sub-division</label>
       <select class="fi" id="ap-sub"></select>
@@ -560,14 +568,18 @@ let COLS=[
   {key:'proc', label:'Procurement'}
 ];
 const SUBS={
+  CO:['CO – Corporate'],
   EL:['EL – across initiative','EL – Smart Power (ELSP)','EL – Smart Building (ELSB)','EL – Distribution Solution (ELDS)','EL – Installation products (ELIP)','EL – Electrification Service'],
   MO:['MO – across initiative','MO – High Power Drives','MO – IEC LV Motors','MO – Motion Traction','MO – Motion Service','MO – Drive Products'],
-  AU:['AU – AUTOMATION (across)','AU – Energy Industries','AU – Process Industries','AU – Measurement & analytics']
+  AU:['AU – AUTOMATION (across)','AU – Energy Industries','AU – Process Industries','AU – Measurement & analytics','AU – B&R Industrial Automation'],
+  RO:['RO – Robotics & Discrete Automation']
 };
 const DS={
+  CO:{h:'#333333',r:'#ffffff',a:'#f0f0f0',b:'#cccccc'},
   EL:{h:'#1A5C2A',r:'#f0f7f1',a:'#d4ebda',b:'#a8d5b0'},
   MO:{h:'#1A3A6B',r:'#f0f4fa',a:'#d0dff5',b:'#a0bae8'},
-  AU:{h:'#7B3A00',r:'#fdf5ee',a:'#fce3c8',b:'#f0c090'}
+  AU:{h:'#7B3A00',r:'#fdf5ee',a:'#fce3c8',b:'#f0c090'},
+  RO:{h:'#5B2D8E',r:'#f5f0fb',a:'#e4d5f5',b:'#c3a5e8'}
 };
 let STATUS={
   s0:{label:'No action',bg:'#f4f3ef',color:'#666',border:'#ddd'},
@@ -579,6 +591,7 @@ let STATUS={
   s5:{label:'Recurring Touchpoint',bg:'#EAF3DE',color:'#3B6D11',border:'#97C459'}
 };
 let ROWS=[
+  {div:'CO',label:'ABB – CORPORATE',short:'CO – Corporate',across:true,rev:''},
   {div:'EL',label:'ELECTRIFICATION – across initiative',short:'EL – across initiative',across:true,rev:'17.4 (all)'},
   {div:'EL',label:'EL – Smart Power (ELSP)',short:'EL – Smart Power (ELSP)',rev:'6.5'},
   {div:'EL',label:'EL – Smart Building (ELSB)',short:'EL – Smart Building (ELSB)',rev:'3.5'},
@@ -594,7 +607,9 @@ let ROWS=[
   {div:'AU',label:'AUTOMATION',short:'AU – AUTOMATION (across)',across:true,rev:'8.1 (all)'},
   {div:'AU',label:'Energy Industries',short:'AU – Energy Industries',rev:'2.5'},
   {div:'AU',label:'Process Industries',short:'AU – Process Industries',rev:'1.5'},
-  {div:'AU',label:'Measurement & analytics',short:'AU – Measurement & analytics',rev:'1.5'}
+  {div:'AU',label:'Measurement & analytics',short:'AU – Measurement & analytics',rev:'1.5'},
+  {div:'AU',label:'B&R Industrial Automation',short:'AU – B&R Industrial Automation',rev:''},
+  {div:'RO',label:'ROBOTICS & DISCRETE AUTOMATION',short:'RO – Robotics & Discrete Automation',across:true,rev:''}
 ];
 const DEFAULT_CONTACTS=[
   {id:1,name:'L. Cavalli',div:'EL',sub:'EL – across initiative',col:'sales',role:'Offering/GTM',owner:'Matteo',star:false,location:'',log:[]},
@@ -693,8 +708,8 @@ async function pullFromCloud(showBanner){
     const remote=rec.contacts||[];
     const prevIds=new Set(contacts.map(c=>c.id));
     contacts=remote;
-    if(rec.rows) ROWS=rec.rows;
-    if(rec.cols) COLS=rec.cols;
+    // ROWS and COLS are always defined locally in the HTML — never overwrite from cloud
+    // (same principle as STATUS colors)
     // Only sync labels from cloud — colors/borders are always defined locally and must not be overwritten
     if(rec.statuses){
       Object.entries(rec.statuses).forEach(([k,v])=>{
@@ -804,8 +819,7 @@ function init(){
       try{
         const d=JSON.parse(saved);
         contacts=d.contacts||d;
-        if(d.rows) ROWS=d.rows;
-        if(d.cols) COLS=d.cols;
+        // ROWS and COLS are always defined locally — never overwrite from localStorage
         if(d.statuses){
           Object.entries(d.statuses).forEach(([k,v])=>{
             if(STATUS[k]){ STATUS[k].label=v.label; }
@@ -1246,7 +1260,7 @@ function updateSubOptions(){
   sel.innerHTML=ROWS.filter(r=>r.div===div).map(r=>`<option value="${r.short}">${r.label}</option>`).join('');
   if(addCell&&addCell.div===div){const o=[...sel.options].find(o=>o.value===addCell.sub);if(o)sel.value=addCell.sub;}
 }
-function openAddFromHeader(){openAdd(SUBS['EL'][0],'bdm','EL');}
+function openAddFromHeader(){openAdd(SUBS['CO'][0],'bdm','CO');}
 function openAdd(sub,col,div){
   addCell={sub,col,div};
   ['ap-name','ap-role','ap-owner','ap-email','ap-phone','ap-linkedin','ap-location','ap-notes'].forEach(id=>document.getElementById(id).value='');
@@ -1275,7 +1289,7 @@ function showWizardStep(n){
     const owner=document.getElementById('ap-owner').value.trim();
     const star=document.getElementById('ap-star').checked;
     document.getElementById('add-summary').innerHTML=
-      `<strong>${name}</strong>${star?' ★':''} → ${sub.replace(/^(EL|MO|AU)\s+[–-]\s+/,'')} · ${colLabel}`+
+      `<strong>${name}</strong>${star?' ★':''} → ${sub.replace(/^(CO|EL|MO|AU|RO)\s+[–-]\s+/,'')} · ${colLabel}`+
       (owner?`<br><span style="color:var(--muted)">Accenture owner: ${owner}</span>`:'');
   }
 }
@@ -1380,7 +1394,7 @@ function dropContact(e){
   c.col=newCol;
   c.div=newDiv;
   save(); renderAll();
-  toast(`${c.name} moved to ${newSub.replace(/^(EL|MO|AU)\s+[–-]\s+/,'')}`);
+  toast(`${c.name} moved to ${newSub.replace(/^(CO|EL|MO|AU|RO)\s+[–-]\s+/,'')}`);
 }
 
 /* ── STATUS MANAGER ── */
@@ -1495,9 +1509,9 @@ function promptAddCol(){
 }
 
 function promptAddRow(){
-  const div=prompt('Division (EL, MO or AU):');
-  if(!div||!['EL','MO','AU'].includes(div.trim().toUpperCase())) {
-    alert('Please enter EL, MO or AU'); return;
+  const div=prompt('Division (CO, EL, MO, AU or RO):');
+  if(!div||!['CO','EL','MO','AU','RO'].includes(div.trim().toUpperCase())) {
+    alert('Please enter CO, EL, MO, AU or RO'); return;
   }
   const d=div.trim().toUpperCase();
   const label=prompt('Sub-division name:');
