@@ -255,6 +255,20 @@ textarea.fi{height:70px;resize:vertical;line-height:1.5}
 .lb-bars{flex:1;display:flex;gap:3px;align-items:center}
 .lb-total{font-family:"DM Mono",monospace;font-size:10px;color:var(--muted);min-width:28px;text-align:right}
 .empty-state{text-align:center;padding:30px;font-size:12px;color:var(--muted);font-style:italic}
+/* Pipeline view */
+.pv-table th{font-size:10px;font-weight:600;color:#fff;padding:8px 10px;text-align:center;border:1px solid #333;vertical-align:middle;letter-spacing:.3px;text-transform:uppercase;position:sticky;top:0;z-index:3}
+.pv-table td{padding:6px 8px;border:1px solid #e0deda;vertical-align:top;min-width:140px}
+.pv-div-hd td{font-size:10px;font-weight:700;letter-spacing:1px;color:#fff;padding:5px 8px;border:1px solid rgba(255,255,255,.15)}
+.pv-sub td:first-child{font-size:10px;color:var(--muted);font-style:italic;white-space:nowrap;position:sticky;left:0;z-index:2;background:inherit;min-width:170px;box-shadow:2px 0 4px rgba(0,0,0,.06)}
+.pv-chip{display:block;padding:4px 7px;margin:2px 0;border-radius:5px;font-size:10px;cursor:pointer;border:.5px solid transparent;transition:opacity .1s}
+.pv-chip:hover{opacity:.75}
+.pv-chip-name{font-weight:600;display:block}
+.pv-chip-role{font-size:9px;opacity:.7;display:block;margin-top:1px}
+.pv-chip-owner{font-size:9px;opacity:.65;font-style:italic}
+.pv-empty{color:#ccc;font-size:11px;text-align:center;padding:8px 0;font-style:italic}
+/* map search highlight */
+.name-chip.map-dim{opacity:.2;filter:grayscale(.5)}
+.name-chip.map-highlight{box-shadow:0 0 0 2.5px #f5c518,0 2px 8px rgba(245,197,24,.4);transform:scale(1.04);z-index:5;position:relative;opacity:1!important;filter:none!important}
 </style>
 </head>
 <body>
@@ -316,6 +330,7 @@ textarea.fi{height:70px;resize:vertical;line-height:1.5}
 <div class="tabs">
   <div class="tab active" data-tab="map" onclick="showTab('map',this)">Origination map</div>
   <div class="tab" data-tab="list" onclick="showTab('list',this)">Contact list</div>
+  <div class="tab" data-tab="pipeline" onclick="showTab('pipeline',this);renderPipelineView()">Pipeline view</div>
   <div class="tab" data-tab="dash" onclick="showTab('dash',this);renderDashboard()">Dashboard</div>
   <div class="tab" data-tab="io" onclick="showTab('io',this)">Import / Export</div>
 </div>
@@ -332,8 +347,26 @@ textarea.fi{height:70px;resize:vertical;line-height:1.5}
       <span style="font-size:11px;font-weight:700;color:var(--ro)">● RO</span>
     </div>
   </div>
-  <div class="map-hint">Click name to log · ★ = budget holder / decision maker · + add to insert contact</div>
-  <div class="map-wrap"><table class="map-table" id="map-table"></table></div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center" id="map-div-filter-bar">
+      <button class="fbtn active" onclick="setMapDivFilter('all',this)">All divisions</button>
+      <button class="fbtn" onclick="setMapDivFilter('CO',this)">CO</button>
+      <button class="fbtn" onclick="setMapDivFilter('EL',this)">EL</button>
+      <button class="fbtn" onclick="setMapDivFilter('MO',this)">MO</button>
+      <button class="fbtn" onclick="setMapDivFilter('AU',this)">AU</button>
+      <button class="fbtn" onclick="setMapDivFilter('RO',this)">RO</button>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+    <div class="map-hint" style="margin-bottom:0">Click name to log · ★ = budget holder / decision maker · + add to insert contact</div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+      <input id="map-search" type="text" placeholder="🔍 Search name on map…" oninput="mapSearch()"
+        style="font-size:12px;padding:5px 10px;border-radius:20px;border:0.5px solid var(--border-dk);background:var(--surface);color:var(--text);width:210px;font-family:'DM Sans',sans-serif;outline:none">
+      <button id="map-search-clear" onclick="clearMapSearch()" style="display:none;font-size:12px;padding:4px 10px;border-radius:20px;border:.5px solid var(--border-dk);background:transparent;cursor:pointer;color:var(--muted);font-family:'DM Sans',sans-serif">✕ Clear</button>
+    </div>
+  </div>
+  <div id="map-search-msg" style="display:none;font-size:11px;color:var(--muted);margin-bottom:6px;padding:5px 10px;background:#fffbea;border:.5px solid #f5c518;border-radius:var(--radius)"></div>
+  <div class="map-wrap" id="map-wrap"><table class="map-table" id="map-table"></table></div>
 </div>
 
 <!-- ══ LIST ══ -->
@@ -359,6 +392,24 @@ textarea.fi{height:70px;resize:vertical;line-height:1.5}
       </tr></thead>
       <tbody id="list-body"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- ══ PIPELINE VIEW ══ -->
+<div class="page" id="page-pipeline">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+    <div style="font-size:12px;color:var(--muted)">Contacts by division / sub-division (Y) and engagement status (X). Excludes No Reply / Not Interested.</div>
+    <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap" id="pv-filter-bar">
+      <button class="fbtn active" onclick="setPVFilter('all',this)">All divisions</button>
+      <button class="fbtn" onclick="setPVFilter('CO',this)">CO</button>
+      <button class="fbtn" onclick="setPVFilter('EL',this)">EL</button>
+      <button class="fbtn" onclick="setPVFilter('MO',this)">MO</button>
+      <button class="fbtn" onclick="setPVFilter('AU',this)">AU</button>
+      <button class="fbtn" onclick="setPVFilter('RO',this)">RO</button>
+    </div>
+  </div>
+  <div style="overflow:auto;border:1px solid var(--border);border-radius:var(--radius-lg);max-height:calc(100vh - 200px)">
+    <table id="pv-table" style="border-collapse:collapse;min-width:900px;width:100%"></table>
   </div>
 </div>
 
@@ -482,7 +533,8 @@ textarea.fi{height:70px;resize:vertical;line-height:1.5}
     <div id="add-step-0">
       <div class="step-lbl">Step 1 of 3 — Who are you adding?</div>
       <label class="fl">Full name</label>
-      <input class="fi" id="ap-name" placeholder="e.g. Luca Cavalli">
+      <input class="fi" id="ap-name" placeholder="e.g. Luca Cavalli" oninput="document.getElementById('ap-dup-err').style.display='none'">
+      <div id="ap-dup-err" style="display:none;font-size:11px;color:#e30613;margin:-4px 0 8px;padding:6px 8px;background:#fdf0ef;border-radius:var(--radius);border:.5px solid #f0b0b0"></div>
       <label class="fl">Role / Title at ABB</label>
       <input class="fi" id="ap-role" placeholder="e.g. CIO">
       <label class="fl">Accenture owner</label>
@@ -978,14 +1030,16 @@ function renderMap(){
   }
   html+='</tr></thead><tbody>';
   let prevDiv='';
-  ROWS.forEach((row,ri)=>{
+  const visibleRows=mapDivFilter==='all'?ROWS:ROWS.filter(r=>r.div===mapDivFilter);
+  visibleRows.forEach((row)=>{
+    const ri=ROWS.indexOf(row);
     const ds=DS[row.div];
     const rowCs=contacts.filter(c=>c.sub===row.short);
     const bg=row.across?ds.a:ds.r;
     const divChanged=row.div!==prevDiv; prevDiv=row.div;
     html+=`<tr>`;
     if(divChanged){
-      const span=ROWS.filter(r=>r.div===row.div).length;
+      const span=visibleRows.filter(r=>r.div===row.div).length;
       html+=`<td rowspan="${span}" style="background:${ds.h};writing-mode:vertical-rl;text-align:center;font-size:10px;font-weight:700;color:#fff;padding:4px 2px;border:1px solid ${ds.b};letter-spacing:1.5px">${row.div}</td>`;
     }
     if(adminMode){
@@ -1032,6 +1086,8 @@ function renderMap(){
     </tr>`;
   }
   tbl.innerHTML=html+'</tbody>';
+  // re-apply map search highlights if active
+  if(mapSearchActive) mapSearch();
 }
 
 function statusStyle(key){
@@ -1406,10 +1462,24 @@ function showWizardStep(n){
 }
 function wizardNext(n){
   if(n===1&&!document.getElementById('ap-name').value.trim()){document.getElementById('ap-name').focus();return;}
+  if(n===1){
+    const name=document.getElementById('ap-name').value.trim().toLowerCase();
+    const dup=contacts.find(c=>c.name.trim().toLowerCase()===name);
+    const errEl=document.getElementById('ap-dup-err');
+    if(dup){errEl.textContent='A contact named "'+dup.name+'" already exists. Please use a unique name.';errEl.style.display='block';return;}
+    else errEl.style.display='none';
+  }
   showWizardStep(n);
 }
 function saveNewPerson(){
   const name=document.getElementById('ap-name').value.trim(); if(!name)return;
+  const dup=contacts.find(c=>c.name.trim().toLowerCase()===name.toLowerCase());
+  if(dup){
+    const errEl=document.getElementById('ap-dup-err');
+    errEl.textContent='A contact named "'+dup.name+'" already exists in the tracker. Please use a unique name.';
+    errEl.style.display='block';
+    return;
+  }
   const sv=document.getElementById('ap-status').value;
   const nc={
     id:nextId++,name,
@@ -2157,6 +2227,117 @@ function renderDashCoverage(){
   document.getElementById('dash-coverage').innerHTML=html;
 }
 
+
+/* ── MAP SEARCH ── */
+let mapSearchActive=false;
+function mapSearch(){
+  const q=(document.getElementById('map-search').value||'').trim().toLowerCase();
+  const clearBtn=document.getElementById('map-search-clear');
+  const msg=document.getElementById('map-search-msg');
+  if(!q){clearMapSearch();return;}
+  clearBtn.style.display='';
+  mapSearchActive=true;
+  const chips=document.querySelectorAll('#map-table .name-chip');
+  let found=[];
+  chips.forEach(chip=>{
+    const nameEl=chip.querySelector('.chip-name');
+    const name=(nameEl?nameEl.textContent:'').toLowerCase();
+    if(name.includes(q)){chip.classList.remove('map-dim');chip.classList.add('map-highlight');found.push(chip);}
+    else{chip.classList.add('map-dim');chip.classList.remove('map-highlight');}
+  });
+  if(found.length){
+    msg.textContent=found.length+' match'+(found.length>1?'es':'')+' found — scrolling to first result';
+    msg.style.display='block';
+    setTimeout(()=>{found[0].scrollIntoView({behavior:'smooth',block:'center',inline:'center'});},80);
+  } else {
+    msg.textContent='No contacts match "'+q+'"';
+    msg.style.display='block';
+  }
+}
+function clearMapSearch(){
+  const inp=document.getElementById('map-search');
+  if(inp) inp.value='';
+  const clearBtn=document.getElementById('map-search-clear');
+  const msg=document.getElementById('map-search-msg');
+  if(clearBtn) clearBtn.style.display='none';
+  if(msg) msg.style.display='none';
+  mapSearchActive=false;
+  document.querySelectorAll('#map-table .name-chip').forEach(chip=>{
+    chip.classList.remove('map-dim','map-highlight');
+  });
+}
+
+/* ── MAP DIVISION FILTER ── */
+let mapDivFilter='all';
+function setMapDivFilter(div,el){
+  mapDivFilter=div;
+  document.querySelectorAll('#map-div-filter-bar .fbtn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderMap();
+}
+
+/* ── PIPELINE VIEW ── */
+let pvFilter='all';
+function setPVFilter(div,el){
+  pvFilter=div;
+  document.querySelectorAll('#pv-filter-bar .fbtn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderPipelineView();
+}
+
+const PV_STATUSES=['s1','s2','s3','s4','s5'];
+
+function renderPipelineView(){
+  const tbl=document.getElementById('pv-table');
+  if(!tbl) return;
+  const divOrder=['CO','EL','MO','AU','RO'];
+  const divNames={CO:'ABB – Corporate',EL:'Electrification',MO:'Motion',AU:'Automation',RO:'Robotics & Discrete Automation'};
+  let html='<thead><tr>';
+  html+=`<th style="background:#1a1a18;text-align:left;padding-left:10px;min-width:170px;position:sticky;left:0;z-index:5;border:1px solid #333">Division / Sub-division</th>`;
+  PV_STATUSES.forEach(sk=>{
+    const s=STATUS[sk];
+    if(!s) return;
+    html+=`<th style="background:#1a1a18;min-width:140px;border:1px solid #333;border-bottom:3px solid ${s.border}">
+      <span style="display:block;font-size:9px;letter-spacing:.4px;text-transform:uppercase;color:#ccc;font-weight:600">${s.label}</span>
+    </th>`;
+  });
+  html+='</tr></thead><tbody>';
+  const divsToShow=pvFilter==='all'?divOrder:[pvFilter];
+  divsToShow.forEach(div=>{
+    const rows=ROWS.filter(r=>r.div===div);
+    if(!rows.length) return;
+    const dc=DS[div]||{};
+    html+=`<tr class="pv-div-hd"><td colspan="${PV_STATUSES.length+1}" style="background:${dc.h||'#333'}">${divNames[div]||div}</td></tr>`;
+    rows.forEach(row=>{
+      const rowBg=row.across?dc.a:dc.r;
+      const rowContacts=contacts.filter(c=>c.sub===row.short);
+      html+=`<tr class="pv-sub" style="background:${rowBg}">`;
+      const label=row.across?`<em>${row.label}</em>`:row.label;
+      html+=`<td style="background:${rowBg};border:1px solid ${dc.b||'#ddd'}">${label}</td>`;
+      PV_STATUSES.forEach(sk=>{
+        const s=STATUS[sk];
+        if(!s){html+='<td></td>';return;}
+        const cellContacts=rowContacts.filter(c=>ls(c)===sk);
+        html+=`<td style="background:#fff;border:1px solid #e8e6e0">`;
+        if(cellContacts.length){
+          cellContacts.forEach(c=>{
+            html+=`<span class="pv-chip" style="background:${s.bg};color:${s.color};border-color:${s.border}" onclick="openModal(${c.id})">`;
+            html+=`<span class="pv-chip-name">${c.star?'★ ':''}${c.name}</span>`;
+            if(c.role) html+=`<span class="pv-chip-role">(${c.role})</span>`;
+            if(c.owner) html+=`<span class="pv-chip-owner">→ ${c.owner}</span>`;
+            html+='</span>';
+          });
+        } else {
+          html+=`<div class="pv-empty">—</div>`;
+        }
+        html+='</td>';
+      });
+      html+='</tr>';
+    });
+  });
+  html+='</tbody>';
+  tbl.innerHTML=html;
+}
 
 init();
 </script>
