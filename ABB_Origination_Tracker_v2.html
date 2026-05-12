@@ -278,11 +278,11 @@ textarea.fi{height:70px;resize:vertical;line-height:1.5}
   <div class="setup-box">
     <div class="logo" style="margin-bottom:20px"><div class="logo-bar"></div><span class="logo-txt" style="color:var(--text)">ABB Origination Tracker</span></div>
     <h2 style="margin-bottom:6px">Connect to shared tracker</h2>
-    <p style="margin-bottom:20px">Enter the Master Key and Bin ID shared with you to access the team tracker.</p>
-    <label class="fl">Master Key</label>
-    <input class="fi" id="setup-key" placeholder="$2a$10$…" style="font-family:'DM Mono',monospace;font-size:11px">
-    <label class="fl">Bin ID</label>
-    <input class="fi" id="setup-binid" placeholder="e.g. 64a3f2e8abc123…" style="font-family:'DM Mono',monospace;font-size:11px">
+    <p style="margin-bottom:20px">Enter your personal GitHub Token. The Gist ID is pre-filled — do not change it.</p>
+    <label class="fl">Your GitHub Token <span style="font-weight:400;color:var(--muted)">(saved in your browser only)</span></label>
+    <input class="fi" id="setup-key" placeholder="ghp_…" style="font-family:'DM Mono',monospace;font-size:11px">
+    <label class="fl">Gist ID <span style="font-weight:400;color:var(--muted)">(shared — do not change)</span></label>
+    <input class="fi" id="setup-binid" value="058e4818aea9dbfdfd702ae3429e8749" style="font-family:'DM Mono',monospace;font-size:11px;background:#f5f5f5" readonly>
     <div id="setup-err" style="font-size:11px;color:#e30613;margin-bottom:8px;display:none"></div>
     <button class="btn btn-p" onclick="setupConnect()" style="width:100%;margin-bottom:8px">Connect →</button>
     <button class="btn" onclick="useLocalOnly()" style="width:100%;font-size:11px;color:var(--muted)">Use locally only (no sharing)</button>
@@ -828,12 +828,13 @@ const DEFAULT_CONTACTS=[
 
 /* ── STATE ── */
 let contacts=[], nextId=50, filterStatus='all', activeId=null, addCell=null, addStepN=0;
-let BIN_ID=null, API_KEY=null, syncTimeout=null, localOnly=false;
+let GIST_ID=null, GH_TOKEN=null, syncTimeout=null, localOnly=false;
+const GIST_FILE='abb-tracker.json';
 let adminMode=false;
 
 /* ── STORAGE KEYS ── */
 const LS_KEY='abb_tracker_v2';
-const LS_CFG='abb_tracker_cfg';
+const LS_CFG='abb_tracker_gist_cfg';
 
 /* ── SYNC ── */
 function setSyncStatus(state,msg){
@@ -844,13 +845,15 @@ function setSyncStatus(state,msg){
 }
 
 async function pushToCloud(){
-  if(localOnly||!BIN_ID||!API_KEY) return;
+  if(localOnly||!GIST_ID||!GH_TOKEN) return;
   setSyncStatus('syncing','saving…');
   try{
-    const r=await fetch('https://api.jsonbin.io/v3/b/'+BIN_ID,{
-      method:'PUT',
-      headers:{'Content-Type':'application/json','X-Master-Key':API_KEY,'X-Bin-Versioning':'false'},
-      body:JSON.stringify({contacts,rows:ROWS,cols:COLS,statuses:STATUS})
+    const body={files:{}};
+    body.files[GIST_FILE]={content:JSON.stringify({contacts,statuses:STATUS})};
+    const r=await fetch('https://api.github.com/gists/'+GIST_ID,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','Authorization':'token '+GH_TOKEN,'Accept':'application/vnd.github+json'},
+      body:JSON.stringify(body)
     });
     if(!r.ok) throw new Error('HTTP '+r.status);
     lastPushedHash=dataHash();
@@ -860,15 +863,17 @@ async function pushToCloud(){
 }
 
 async function pullFromCloud(showBanner){
-  if(localOnly||!BIN_ID||!API_KEY) return;
+  if(localOnly||!GIST_ID||!GH_TOKEN) return;
   setSyncStatus('syncing','loading…');
   try{
-    const r=await fetch('https://api.jsonbin.io/v3/b/'+BIN_ID+'/latest',{
-      headers:{'X-Master-Key':API_KEY}
+    const r=await fetch('https://api.github.com/gists/'+GIST_ID,{
+      headers:{'Authorization':'token '+GH_TOKEN,'Accept':'application/vnd.github+json'}
     });
     if(!r.ok) throw new Error('HTTP '+r.status);
     const j=await r.json();
-    const rec=j.record;
+    const raw=j.files[GIST_FILE]&&j.files[GIST_FILE].content;
+    if(!raw) throw new Error('File not found in gist');
+    const rec=JSON.parse(raw);
     const remote=rec.contacts||[];
     const prevIds=new Set(contacts.map(c=>c.id));
     contacts=remote;
@@ -941,9 +946,9 @@ async function setupConnect(){
   const key=document.getElementById('setup-key').value.trim();
   const binId=document.getElementById('setup-binid').value.trim();
   const err=document.getElementById('setup-err');
-  if(!key||!binId){err.textContent='Please enter both Master Key and Bin ID.';err.style.display='block';return;}
+  if(!key||!binId){err.textContent='Please enter both GitHub Token and Gist ID.';err.style.display='block';return;}
   err.style.display='none';
-  BIN_ID=binId; API_KEY=key;
+  GIST_ID=binId; GH_TOKEN=key;
   localStorage.setItem(LS_CFG,JSON.stringify({binId,apiKey:key}));
   document.getElementById('setup-screen').classList.remove('show');
   await pullFromCloud(false);
@@ -962,21 +967,21 @@ function useLocalOnly(){
 }
 
 function showSetup(){
-  document.getElementById('setup-key').value=API_KEY||'';
-  document.getElementById('setup-binid').value=BIN_ID||'';
+  document.getElementById('setup-key').value=GH_TOKEN||'';
+  document.getElementById('setup-binid').value=GIST_ID||'058e4818aea9dbfdfd702ae3429e8749';
   document.getElementById('setup-err').style.display='none';
   document.getElementById('setup-screen').classList.add('show');
 }
 
 function copyShareInfo(){
-  const text='ABB Origination Tracker\nMaster Key: '+API_KEY+'\nBin ID: '+BIN_ID;
+  const text='ABB Origination Tracker\nGitHub Token: '+GH_TOKEN+'\nGist ID: '+GIST_ID;
   navigator.clipboard.writeText(text).then(()=>toast('Copied to clipboard'));
 }
 
 function updateIOInfo(){
   const el=document.getElementById('io-sync-info');
   if(localOnly) el.textContent='Running in local-only mode. Data is saved to this browser only.';
-  else if(BIN_ID) el.innerHTML='Connected to JSONBin. Bin ID: <code style="font-family:DM Mono,monospace;font-size:11px">'+BIN_ID+'</code><br>Share this file + the same API key with your team. All changes sync automatically.';
+  else if(GIST_ID) el.innerHTML='Connected to GitHub Gist. Gist ID: <code style="font-family:DM Mono,monospace;font-size:11px">'+GIST_ID+'</code><br>Share this file + the same GitHub Token with your team. All changes sync automatically.';
   else el.textContent='Not connected. Complete setup first.';
 }
 
@@ -985,9 +990,11 @@ function init(){
   loadDismissals();
   const cfg=localStorage.getItem(LS_CFG);
   if(cfg){
-    try{const c=JSON.parse(cfg);BIN_ID=c.binId;API_KEY=c.apiKey;}catch(e){}
+    try{const c=JSON.parse(cfg);GIST_ID=c.binId||GIST_ID;GH_TOKEN=c.apiKey||GH_TOKEN;}catch(e){}
   }
-  if(BIN_ID&&API_KEY){
+  // Gist ID is always fixed — only token comes from user
+  if(!GIST_ID) GIST_ID='058e4818aea9dbfdfd702ae3429e8749';
+  if(GIST_ID&&GH_TOKEN){
     const saved=localStorage.getItem(LS_KEY);
     if(saved){
       try{
