@@ -853,6 +853,7 @@ async function pushToCloud(){
       body:JSON.stringify({contacts,rows:ROWS,cols:COLS,statuses:STATUS})
     });
     if(!r.ok) throw new Error('HTTP '+r.status);
+    lastPushedHash=dataHash();
     setSyncStatus('ok','saved '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
     localStorage.setItem(LS_KEY,JSON.stringify({contacts,rows:ROWS,cols:COLS}));
   }catch(e){setSyncStatus('err','sync error');console.error(e);}
@@ -898,9 +899,19 @@ async function pullFromCloud(showBanner){
   }catch(e){setSyncStatus('err','sync error');console.error(e);}
 }
 
+let lastPushedHash='';
+function dataHash(){
+  // lightweight fingerprint — avoids pushing when nothing changed
+  return JSON.stringify(contacts.map(c=>({id:c.id,name:c.name,log:c.log,row:c.row,col:c.col})));
+}
 function schedulePush(){
   if(syncTimeout) clearTimeout(syncTimeout);
-  syncTimeout=setTimeout(pushToCloud,800);
+  syncTimeout=setTimeout(()=>{
+    const h=dataHash();
+    if(h===lastPushedHash) return; // nothing changed, skip the write
+    lastPushedHash=h;
+    pushToCloud();
+  },8000); // 8s debounce — reduces writes by ~10x vs 800ms
 }
 
 function save(){
